@@ -1,5 +1,5 @@
 ---
-status: approved
+status: implemented
 ---
 
 # 工作流 Skill 绑定改存 Catalog ID，依赖报告与卸载检查按运行时解析判定
@@ -12,8 +12,8 @@ Desktop 工作流编辑器为 Agent 节点新选择的 Skill 一律写入 Catalo
 保留 `plugin:` 形式；desktop 同时接受 cloud v2 写出的插件 ID 引用 `<namespace>/<identifier>`，cloud v2 的
 workflows 契约同时接受 `plugin:` 形式（D4）。
 
-本决策为 `approved`。涉及 desktop 的 `packages/app-shell` 工作流编辑器、导入依赖报告、卸载影响检查、运行页
-配置展示与工作流导出，以及 `crates/backend` 工作流 Skill 解析器新增的插件 ID 引用；另要求 cloud v2 的
+本决策的 desktop 范围已实现并验证，状态为 `implemented`。涉及 desktop 的 `packages/app-shell` 工作流编辑器、
+导入依赖报告、卸载影响检查、运行页配置展示与工作流导出，以及 `crates/backend` 工作流 Skill 解析器新增的插件 ID 引用；另要求 cloud v2 的
 workflows 契约多认一种插件 Skill 写法（D4 第 6 条），cloud 侧不在本文实现范围内。后端启动预检与运行冻结规则
 （[Skill 按存储路径交付](../../../core/agent/session/skill/0-skill-catalog-from-storage-paths.md) D8）是本文的判定
 基准，本文只在解析表中加入插件 ID 引用一行，冻结、预检时机、不回落和调用名冲突规则不变。工作流图 JSON
@@ -72,8 +72,8 @@ Skill Catalog 允许同名 Skill 并存：同一名称可以同时来自本地�
 4. 绑定展示按 D2 的解析结果把引用值显示为 Skill 名称和来源；解析不到时显示原始引用值并标明缺失，不把
    UUID 或 `plugin:` ID 当作名称直接展示。
 5. 同一节点内去重按解析后的 Catalog ID 判断：裸名称唯一解析到 X 时，再添加 X 的精确 ID 视为重复。
-6. 同一张图内两个不同 Skill 解析出相同调用名时，运行会在启动时被拒绝（D8 第 7 条）。编辑器在节点配置中
-   提示这种冲突，提示不阻止保存。
+6. 同一张图参与执行的节点中，两个启用的不同 Skill 解析出相同调用名时，运行会在启动时被拒绝（D8 第 7 条）。
+   编辑器按后端成员分析得到的执行节点提示这种冲突，不把未连接的备用节点计入；提示不阻止保存。
 
 为什么写 Catalog ID：名称不是 Skill 的身份，只有 Catalog ID 能在同名时稳定指向用户选的那一个。之后再安装
 同名 Skill，已绑定的工作流不受影响，不会突然在启动时因歧义被拒。
@@ -116,7 +116,7 @@ Skill 绑定按启动预检的规则解析，按表中顺序取第一条命中�
 本节修改[市场工作流导入](20261109-marketplace-workflow-import.md) D4「卸载被工作流引用的 MCP / Skill 插件」中 Skill
 的身份边界，入口、扫描范围（草稿与已发布快照）、只警告不阻止、加载期间禁用确认等规则不变。
 
-对每个 Skill 绑定，分别以当前目录和「去掉待卸载插件全部 Skill 后的目录」按 D2 解析：
+只对启用的 Skill 绑定，分别以当前目录和「去掉待卸载插件全部 Skill 后的目录」按 D2 解析：
 
 | 卸载前 | 卸载后 | 呈现 |
 | --- | --- | --- |
@@ -162,7 +162,7 @@ ID 绑定插件 Skill 的引用一定失败，按名称匹配又可能因大小�
 3. 精确 Catalog ID、`plugin:` 前缀引用和插件 ID 引用在任何判定中都不回落到同名 Skill。
 4. 裸名称或插件 ID 引用匹配到多条记录（含不可用记录）时，判定结果是歧义，按阻断运行呈现。
 5. 只有启用的绑定计入阻断横幅。
-6. 卸载检查只把「卸载后会缺失」的绑定列为会失败；卸载只警告、不阻止的规则不变。
+6. 卸载检查只把「卸载后会缺失」的启用绑定列为会失败；卸载只警告、不阻止的规则不变。
 7. 导出文件不含本机 Skill 的 UUID，插件 Skill 引用保留 `plugin:` 形式。
 8. D1 与 D4 在同一个 desktop 正式版中发布。
 
@@ -205,5 +205,5 @@ ID 绑定插件 Skill 的引用一定失败，按名称匹配又可能因大小�
    裸名称、MCP 与 Agent 插件的卸载规则。开始改变：编辑器写入 Catalog ID，解析器接受插件 ID 引用，报告新增
    歧义状态并只统计启用绑定，卸载检查按前后解析判断，导出转换本机 Skill 引用。
 2. **cloud 适配**：D4 第 6 条由 [ora-space/circus#1593](https://github.com/ora-space/circus/issues/1593) 的 phase2 workflows 契约承接，与 desktop 实现互不阻塞。
-3. **落地**：desktop 实现合并后，本文改为 `implemented`，回填核心用例证据；cloud 侧证据记在 cloud 的决策和
-   用例里。
+3. **证据归属**：desktop 核心用例记录代表性直接证据与尚存覆盖缺口；cloud 侧状态和证据记在 cloud 的决策和
+   用例里，不由本文的 `implemented` 状态代表。
