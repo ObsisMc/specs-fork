@@ -209,7 +209,7 @@ Skill，又会执行错误的说明。
 | 卸载解除歧义时不列为会失败；前后都歧义时不新增影响 | [本地与插件同名 lint 卸载后唯一时不列出](https://github.com/ora-space/desktop/blob/ffe0b82df2adf2ecbbf237aaa5e1729bd3879f71/packages/app-shell/src/features/settings/workflow-dependency-impact.test.ts#L513)。尚无卸载前后都维持歧义的专用断言 | `Partial` |
 | 警告文案改为启动会被拒绝，仍只警告不阻止 | [卸载警告及确认后仍执行卸载](https://github.com/ora-space/desktop/blob/ffe0b82df2adf2ecbbf237aaa5e1729bd3879f71/packages/app-shell/src/features/settings/plugins-settings.test.tsx#L2191)；尚无「启动会被拒绝」完整文案的直接断言 | `Partial` |
 | 禁用 Skill 绑定不计入启动影响，也不单独带出节点标题 | [禁用 Skill 不报启动影响且排除其节点标题](https://github.com/ora-space/desktop/blob/ffe0b82df2adf2ecbbf237aaa5e1729bd3879f71/packages/app-shell/src/features/settings/workflow-dependency-impact.test.ts#L558) | `Covered` |
-| 备用非 Agent 节点的残留 Skill 配置不导致 Agent 依赖漏报 | [Agent 依赖与备用 Output 残留配置共存](https://github.com/ora-space/desktop/blob/ffe0b82df2adf2ecbbf237aaa5e1729bd3879f71/packages/app-shell/src/features/settings/workflow-dependency-impact.test.ts#L596) | `Covered` |
+| 备用非 Agent 节点的残留 Skill 配置不导致 Agent 节点的依赖漏报 | [Agent 节点的依赖与备用 Output 残留配置共存](https://github.com/ora-space/desktop/blob/ffe0b82df2adf2ecbbf237aaa5e1729bd3879f71/packages/app-shell/src/features/settings/workflow-dependency-impact.test.ts#L596) | `Covered` |
 
 ### 决策依据
 
