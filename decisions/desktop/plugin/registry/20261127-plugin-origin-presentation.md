@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: approved
 ---
 
 # 插件来源展示：后端下发 Plugin Origin 与查询时计算的市场标签
@@ -11,10 +11,14 @@ URL 计算：默认取最后一个路径段，与其他来源重名时补上从�
 `PluginOrigin` 随 `Skill`、`InstalledPlugin`、`AvailablePlugin` 一起下发，前端只渲染，不解析 URL，也不
 计算消歧。标签只用于展示，不是身份，新增同名来源后已有标签可能变化；身份始终是 namespace。
 
-本决策为 `proposed`，尚在评审，没有实现。涉及 desktop 的 `crates/contracts`（`SkillSource`、
-`InstalledPlugin`、`AvailablePlugin`）、`crates/backend`（按 namespace 反查 canonical URL、标签计算、
-三个查询的装配）、`crates/db`（只读 `plugin_source_namespace`，不改 schema）以及 `packages/app-shell`
-（共用来源标签组件、三处接入、插件详情的来源市场行、市场源变更后的查询失效、中英文文案）。
+本决策为 `approved`：owner 于 2026-11-27 经两轮评审后批准，核心测试用例见
+[插件来源展示用例](../../../../test-cases/desktop/plugin/registry/origin-presentation.md)。实现尚未合入
+desktop 的 main，用例义务如实标为 `Missing`；实现合入并完成验证后，由落地运行按最终实现同步正文并改为
+`implemented`。涉及 desktop 的 `crates/contracts`（`SkillSource`、`InstalledPlugin`、`AvailablePlugin`）、
+`crates/domain`（`PluginOrigin` 与来源分类）、`crates/utils`（市场标签计算）、`crates/backend`（按
+namespace 反查 canonical URL、三个查询的装配）、`crates/db`（只读 `plugin_source_namespace`，不改
+schema）以及 `packages/app-shell`（共用来源标签组件、三处接入、插件详情的来源市场行、市场源变更后的查询
+失效、中英文文案）。
 
 - **不改变**：namespace 的派生、绑定与不可变规则，安装目录与 `skills` 表的身份匹配，索引缓存格式，
   `plugin_source_namespace` 的 schema 与只增不删的写入规则。
@@ -75,7 +79,8 @@ namespace 决策让不同来源的同名插件可以并存，同时把消歧责�
 2. 判定只看 namespace，不看当前的市场源配置。插件的来源是“首次引入它的来源”（Namespace D3）：市场源被删除、
    禁用，或插件在当前市场里已经找不到时，来源仍然不变。
 3. 官方与第三方市场的区分沿用 Namespace D4 的保留值，不按 URL 判断。默认 marketplace 短路到 `official`，
-   它的 URL 不在绑定表中，也不需要在。
+   它的 URL 不在绑定表中，也不需要在；但它的 canonical URL 进入第三方标签的比较集合（D3），只参与消歧
+   比较，自身的来源与标签仍是“官方”。
 
 为什么来源是插件级而不是 Skill 级：Skill 没有独立于插件的来源，它是插件包的一部分，随插件安装、升级和卸载。
 把来源挂在 Skill 上会让同一插件的两个 Skill 有机会显示不同来源，这种状态没有意义。
@@ -115,10 +120,11 @@ enum SkillSource {
 4. 按 namespace 反查 URL：后端读取 `plugin_source_namespace` 的 namespace → canonical URL 映射（namespace 列唯一）。
    绑定表只增不删，且插件安装前绑定必定已经写入（Namespace D3），所以已安装插件的派生 namespace 都能查到 URL。
    查不到时属于损坏状态：后端记录告警，不让整个列表查询失败，该条目的来源降级为 `Marketplace`，`source_url`
-   为空，标签取 namespace 的 slug 段（`.` 之前的部分）。读取绑定表本身失败时同样处理：记录告警，按空绑定集合
-   计算，所有派生 namespace 都按上述规则降级，响应不因此失败。
+   为空，标签取 namespace 的 slug 段（`.` 之前的部分）。读取绑定表本身失败时同样处理：记录告警，按空绑定
+   集合计算（比较集合只剩默认 marketplace 的 canonical URL），所有派生 namespace 都按上述规则降级，响应
+   不因此失败。
 
-为什么由后端下发而不是让前端反查：绑定表在后端，标签计算需要完整的绑定集合（D3）。让前端拿到绑定表再自己算，
+为什么由后端下发而不是让前端反查：绑定表在后端，标签计算需要完整的比较集合（D3）。让前端拿到绑定表再自己算，
 等于把一张身份表和一套消歧规则都复制到前端，三个界面还要各自保证算出同一个结果。
 
 为什么 `AvailablePlugin` 保留 `source_url`：市场搜索按 URL 匹配，Namespace D6 要求索引条目把归属 URL 随前端契约
@@ -130,15 +136,16 @@ enum SkillSource {
 **分段**：把 canonical URL 去掉 `https://` 后按 `/` 切成段，第一段是 host（带非默认端口），其余是路径段。
 canonical URL 已经去掉 userinfo、默认端口、尾部 `/` 与 `.git` 并转为小写（Namespace D2），所以分段结果是确定的。
 
-**比较集合**：`plugin_source_namespace` 中的全部绑定，包括市场源已被删除、但绑定仍在的来源。默认 marketplace
-不在绑定表中，也不进入比较集合：它显示为“官方”，不会与任何第三方标签混淆。
+**比较集合**：`plugin_source_namespace` 中的全部绑定（包括市场源已被删除、但绑定仍在的来源），加上默认
+marketplace 的 canonical URL。默认 marketplace 不在绑定表中，它的 canonical URL 由后端在计算时补入，只参与
+消歧比较：它自身的来源仍是 `official`，显示为“官方”，不产生第三方标签。
 
 **计算规则**：
 
-1. 默认标签是最后一段（仓库名）。比较集合里没有其他绑定的最后一段与它相同时，标签就是这一段。
-2. 有重名时，在最后一段相同的那组绑定内，从倒数第二段往前逐段比较，找到第一个使本绑定与组内其他所有绑定都不同的段，
+1. 默认标签是最后一段（仓库名）。比较集合里没有其他来源的最后一段与它相同时，标签就是这一段。
+2. 有重名时，在最后一段相同的那组来源内，从倒数第二段往前逐段比较，找到第一个使本来源与组内其他所有来源都不同的段，
    标签写成“该段 + 仓库名”；两段不相邻时，中间用 `…` 表示省略。
-3. 段数不同的 URL 按从末尾对齐的位置比较。其他绑定在该位置没有段时，视为与本绑定在该位置的段不同；本绑定
+3. 段数不同的 URL 按从末尾对齐的位置比较。其他来源在该位置没有段时，视为与本来源在该位置的段不同；本来源
    自己在该位置没有段时，不能用这个位置作标签，跳过并继续往前。
 4. 不存在这样的单个段时，该来源的标签回落为去掉 `https://` 的完整 canonical URL。
 5. 整组标签生成后，再按实际显示文本判重：规则 2 只保证所选段在同一位置上唯一，不同位置选中的同一个段会渲染成
@@ -148,11 +155,16 @@ canonical URL 已经去掉 userinfo、默认端口、尾部 `/` 与 `.git` 并�
 | --- | --- |
 | `github.com/acme/awesome-plugins` | `awesome-plugins` |
 | `github.com/acme/marketplace`、`github.com/obsismc/marketplace` | `acme/marketplace`、`obsismc/marketplace` |
+| `github.com/ora-space/marketplace`（默认源）、`github.com/obsismc/marketplace` | `obsismc/marketplace`（默认源自身显示“官方”，不产生第三方标签） |
 | `github.com/acme/tools`、`gitlab.com/acme/tools` | `github.com/…/tools`、`gitlab.com/…/tools` |
 | `git.example.com:8443/scm/infra/registry`、`git.example.com/scm/infra/registry` | `git.example.com:8443/…/registry`、`git.example.com/…/registry` |
 | `github.com/a/x/m`、`github.com/a/y/m`、`github.com/b/x/m` | `github.com/a/x/m`（回落）、`y/m`、`b/…/m` |
 | `github.com/p/x/a/m`、`github.com/x/b/a/m`、`github.com/q/b/c/m` | 前两个按规则 2 都会显示 `x/…/m`，按规则 5 整组回落为完整 URL |
 | `dev.azure.com/contoso/a/_git/registry`、`dev.azure.com/contoso/a/scm/registry` | `_git/registry`、`scm/registry`（平台字面量照样显示） |
+
+默认源的 canonical URL 恒在比较集合中；除显式列出它的那一行外，表中各行只列绑定表中的绑定。默认源的最后
+一段 `marketplace` 只与两个 `marketplace` 行重名，组内倒数第二段仍两两不同，各行标签不变；其余行的仓库名
+与它不重名，结果也不受影响。
 
 规则 2 只比较段的字面值，不判断哪一段是组织、项目或平台字面量。即使某一段是 Azure 的 `_git` 或 Bitbucket Server 的
 `scm`，只要它是第一个不同的段，就照样显示。这延续 Namespace D2 的立场：不理解 URL 结构，只用跨平台都成立的
@@ -160,14 +172,21 @@ canonical URL 已经去掉 userinfo、默认端口、尾部 `/` 与 `.git` 并�
 
 **时机与身份边界**：
 
-- 标签在每次查询时计算，不写入任何表或缓存。每个响应读取一次全部绑定，构造一份快照，响应内所有条目用这份快照
-  计算；各响应用同一个函数，所以同一份绑定集合下，`/` 菜单、技能页与市场卡片对同一来源看到的标签一致。
+- 标签在每次查询时计算，不写入任何表或缓存。每个响应读取一次全部绑定，补入默认 marketplace 的 canonical URL，
+  构造一份快照，响应内所有条目用这份快照计算；各响应用同一个函数，所以同一份比较集合下，`/` 菜单、技能页与
+  市场卡片对同一来源看到的标签一致。
 - 标签不是身份。新增一个同名来源后，已有来源的标签会从 `marketplace` 变成 `acme/marketplace`；删除市场源不会
   让标签变回去，因为绑定还在。任何匹配、存储和日志都继续用 namespace 或 Canonical Plugin ID，不用标签。
 
 为什么比较集合是全部绑定而不是当前启用的市场源：已安装插件的来源可能已经不在市场源列表里，但它仍会出现在
 `/` 菜单和技能页上。只和当前市场源比较，删除一个源就可能让两个已安装插件的标签变得相同。绑定表正好是“出现过的
 所有来源”，且只增不删。
+
+为什么还要补入默认 marketplace 的 canonical URL：本决策的典型场景正是官方市场的 fork——默认源
+`github.com/ora-space/marketplace` 与 `github.com/obsismc/marketplace` 并存时，若默认源不参与比较，唯一的
+fork 的标签就只是 `marketplace`，和“官方”放在一起看不出它是谁的 fork；参与比较后它显示为
+`obsismc/marketplace`。默认源自身仍短路到 `official`、显示为“官方”，不产生第三方标签，所以补入它不会引入
+与“官方”混淆的新标签。
 
 为什么不持久化：标签依赖整个比较集合，任何一次新增绑定都可能改变已有来源的标签。持久化就要在每次新增绑定时
 重算并改写其他行，而这只是为了缓存一个展示字段；绑定表通常只有个位数到几十行，查询时计算的代价可以忽略。
@@ -209,6 +228,7 @@ canonical URL 已经去掉 userinfo、默认端口、尾部 `/` 与 `.git` 并�
 | **前端计算标签** | 前端要拿到完整绑定表并复制消歧规则，三个界面各自计算，容易在不同查询返回的不同集合上算出不同标签；`Skill` 与 `InstalledPlugin` 本来也没有 URL |
 | **持久化标签** | 标签依赖整个比较集合，新增一个绑定就可能要改写其他行；持久化只缓存了一个展示字段，却引入了“存的标签和当前集合不一致”这种新的错误状态 |
 | **只和当前启用的市场源比较** | 已安装插件的来源可能已被删除，比较集合变小后，两个已安装插件可能显示相同标签，正是要消除的问题 |
+| **默认 marketplace 不进比较集合** | 官方市场的 fork 是唯一第三方来源时只显示 `marketplace`，和“官方”放在一起看不出它是谁的 fork；默认源参与比较后 fork 显示 `obsismc/marketplace`，而默认源自身仍显示“官方”，不产生第三方标签 |
 | **tooltip 放完整 URL 或域名** | 位置狭窄、长度不可控，会挤掉说明；域名在多数情况下没有区分度。完整 URL 放在插件详情，需要时可以复制 |
 | **直接展示 namespace 或其 slug** | Namespace D6 已明确 namespace 含摘要后缀，对用户没有可读性；slug 还会因截断和折叠而重名 |
 | **用户自定义市场显示名作为本期方案** | 最可读，也不会随新增来源变化，但需要新增配置字段、编辑界面和重名处理，而且显示名只存在于本机；本期先用计算标签解决区分问题，自定义显示名留作后续增量（见下文） |
@@ -217,8 +237,9 @@ canonical URL 已经去掉 userinfo、默认端口、尾部 `/` 与 `.git` 并�
 
 1. 来源只由插件的 namespace 决定：`local` 是本地包，`official` 是官方，其余是第三方市场；本地 Skill 是用户来源。
 2. 插件提供的 Skill 与所属插件的来源相同。
-3. 第三方市场标签只在后端计算，比较集合是 `plugin_source_namespace` 的全部绑定；同一份绑定集合下，所有带 `origin`
-   的响应对同一来源给出相同标签，同一组内的标签按显示文本互不相同。
+3. 第三方市场标签只在后端计算，比较集合是 `plugin_source_namespace` 的全部绑定加默认 marketplace 的
+   canonical URL；同一份比较集合下，所有带 `origin` 的响应对同一来源给出相同标签，同一组内的标签按显示文本
+   互不相同。
 4. 标签不持久化、不参与任何身份匹配；身份仍是 namespace 与 Canonical Plugin ID。
 5. 标签计算不按平台解析 URL 结构，只比较 canonical URL 的段。
 6. 用户可见的标签和 tooltip 不显示 namespace 或 Canonical Plugin ID；tooltip 不显示标签、URL 或域名。带协议的完整
@@ -249,3 +270,12 @@ canonical URL 已经去掉 userinfo、默认端口、尾部 `/` 与 `.git` 并�
 
 两步在同一个 desktop 版本发布，前后端契约同时变化。从这个版本开始，三处界面显示来源标签，技能页不再显示 plugin ID；
 插件身份、安装目录、Skill 匹配与市场源配置的行为不变。
+
+## 核心测试用例
+
+见[插件来源展示用例](../../../../test-cases/desktop/plugin/registry/origin-presentation.md)：来源按
+namespace 分为四类且是插件级属性、所有带 `origin` 的响应装配同一套判定，D3 例表全部行（含默认源 fork 行与
+规则 5 整组回落行）的标签计算，绑定缺失或绑定表读取失败时降级而不失败，同一份比较集合下各响应标签一致，
+以及新增同名来源后标签变化而身份不变。实现尚未合入 desktop 的 main，义务如实标为 `Missing`；
+[身份与 namespace 用例](../../../../test-cases/desktop/plugin/registry/identity-and-namespace.md)的证据保持
+各自范围，不推导本文新义务。

@@ -221,7 +221,7 @@ namespace 内保持稳定；版本升级不会改变 identifier。
 Plugin Origin 是插件面向用户展示的来源类别，由宿主按插件的 namespace 判定：`local` 是本地包，`official`
 是官方，其余是第三方市场。插件提供的 Skill 继承所属插件的来源；本地 Skill 不属于任何插件，来源为“用户”。
 第三方市场的标签由后端在查询时计算，只用于展示，可能随新增来源变化，不是身份，也不替代 namespace。定义来源是
-[插件来源展示决策](../decisions/desktop/plugin/registry/20261127-plugin-origin-presentation.md)（`proposed`）。
+[插件来源展示决策](../decisions/desktop/plugin/registry/20261127-plugin-origin-presentation.md)。
 
 ### Canonical Plugin ID
 
