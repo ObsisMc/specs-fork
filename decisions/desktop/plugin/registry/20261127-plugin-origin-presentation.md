@@ -105,8 +105,9 @@ enum SkillSource {
 
 规则：
 
-1. 三个查询（Skill 列表与详情、已安装插件列表、市场列表）在返回前由后端填好 `origin`。前端不再从
-   `namespace` 或 `plugin_id` 推断来源，也不再显示原始 namespace。
+1. 所有返回 `Skill`、`SkillDetails`、`InstalledPlugin` 或 `AvailablePlugin` 的响应都由后端填好 `origin`，
+   包括 Skill 列表与详情、已安装插件列表及扫描、激活和停止响应，以及市场列表和索引同步响应。各响应复用同一套
+   来源判定与标签规则；前端不再从 `namespace` 或 `plugin_id` 推断来源，也不再显示原始 namespace。
 2. `AvailablePlugin` 只会出现 `Official` 与 `Marketplace`：市场列表里的条目都来自某个市场源，`LocalArchive`
    不在其中。
 3. `Marketplace.source_url` 是绑定表里的 canonical URL，用于插件详情信息表的“来源市场”一行（D4）。它只在
@@ -114,7 +115,8 @@ enum SkillSource {
 4. 按 namespace 反查 URL：后端读取 `plugin_source_namespace` 的 namespace → canonical URL 映射（namespace 列唯一）。
    绑定表只增不删，且插件安装前绑定必定已经写入（Namespace D3），所以已安装插件的派生 namespace 都能查到 URL。
    查不到时属于损坏状态：后端记录告警，不让整个列表查询失败，该条目的来源降级为 `Marketplace`，`source_url`
-   为空，标签取 namespace 的 slug 段（`.` 之前的部分）。
+   为空，标签取 namespace 的 slug 段（`.` 之前的部分）。读取绑定表本身失败时同样处理：记录告警，按空绑定集合
+   计算，所有派生 namespace 都按上述规则降级，响应不因此失败。
 
 为什么由后端下发而不是让前端反查：绑定表在后端，标签计算需要完整的绑定集合（D3）。让前端拿到绑定表再自己算，
 等于把一张身份表和一套消歧规则都复制到前端，三个界面还要各自保证算出同一个结果。
@@ -136,8 +138,11 @@ canonical URL 已经去掉 userinfo、默认端口、尾部 `/` 与 `.git` 并�
 1. 默认标签是最后一段（仓库名）。比较集合里没有其他绑定的最后一段与它相同时，标签就是这一段。
 2. 有重名时，在最后一段相同的那组绑定内，从倒数第二段往前逐段比较，找到第一个使本绑定与组内其他所有绑定都不同的段，
    标签写成“该段 + 仓库名”；两段不相邻时，中间用 `…` 表示省略。
-3. 段数不同的 URL 按从末尾对齐的位置比较；某个绑定在该位置没有段时，视为与有段的绑定不同。
-4. 不存在这样的单个段时，标签回落为去掉 `https://` 的完整 canonical URL。
+3. 段数不同的 URL 按从末尾对齐的位置比较。其他绑定在该位置没有段时，视为与本绑定在该位置的段不同；本绑定
+   自己在该位置没有段时，不能用这个位置作标签，跳过并继续往前。
+4. 不存在这样的单个段时，该来源的标签回落为去掉 `https://` 的完整 canonical URL。
+5. 整组标签生成后，再按实际显示文本判重：规则 2 只保证所选段在同一位置上唯一，不同位置选中的同一个段会渲染成
+   相同文本。仍有重名时，该组全部使用去掉 `https://` 的完整 canonical URL。
 
 | 比较集合（canonical URL，省略 `https://`） | 标签 |
 | --- | --- |
@@ -146,6 +151,8 @@ canonical URL 已经去掉 userinfo、默认端口、尾部 `/` 与 `.git` 并�
 | `github.com/acme/tools`、`gitlab.com/acme/tools` | `github.com/…/tools`、`gitlab.com/…/tools` |
 | `git.example.com:8443/scm/infra/registry`、`git.example.com/scm/infra/registry` | `git.example.com:8443/…/registry`、`git.example.com/…/registry` |
 | `github.com/a/x/m`、`github.com/a/y/m`、`github.com/b/x/m` | `github.com/a/x/m`（回落）、`y/m`、`b/…/m` |
+| `github.com/p/x/a/m`、`github.com/x/b/a/m`、`github.com/q/b/c/m` | 前两个按规则 2 都会显示 `x/…/m`，按规则 5 整组回落为完整 URL |
+| `dev.azure.com/contoso/a/_git/registry`、`dev.azure.com/contoso/a/scm/registry` | `_git/registry`、`scm/registry`（平台字面量照样显示） |
 
 规则 2 只比较段的字面值，不判断哪一段是组织、项目或平台字面量。即使某一段是 Azure 的 `_git` 或 Bitbucket Server 的
 `scm`，只要它是第一个不同的段，就照样显示。这延续 Namespace D2 的立场：不理解 URL 结构，只用跨平台都成立的
@@ -153,8 +160,8 @@ canonical URL 已经去掉 userinfo、默认端口、尾部 `/` 与 `.git` 并�
 
 **时机与身份边界**：
 
-- 标签在每次查询时计算，不写入任何表或缓存。三个查询用同一个函数和同一份绑定集合，所以 `/` 菜单、技能页与
-  市场卡片对同一来源看到的标签一致。
+- 标签在每次查询时计算，不写入任何表或缓存。每个响应读取一次全部绑定，构造一份快照，响应内所有条目用这份快照
+  计算；各响应用同一个函数，所以同一份绑定集合下，`/` 菜单、技能页与市场卡片对同一来源看到的标签一致。
 - 标签不是身份。新增一个同名来源后，已有来源的标签会从 `marketplace` 变成 `acme/marketplace`；删除市场源不会
   让标签变回去，因为绑定还在。任何匹配、存储和日志都继续用 namespace 或 Canonical Plugin ID，不用标签。
 
@@ -172,10 +179,12 @@ canonical URL 已经去掉 userinfo、默认端口、尾部 `/` 与 `.git` 并�
 2. 第三方市场的说明必须体现“首次从该市场引入”，不能写成“来自该市场”。这是 Namespace D3 对用户可见文案的要求：
    市场源变化后，插件的来源不跟着变。
 3. 本地包的说明带上插件的显示名，让用户知道卸载哪个插件会移除这个 Skill。
-4. tooltip 不放完整 URL，也不放域名。完整 canonical URL 只在插件详情信息表的“来源市场”一行显示，带复制按钮；
-   `source_url` 为空时这一行不显示。官方插件的这一行显示“Ora 官方市场”。
-5. tooltip 限宽并允许换行。标签在窄空间里可以截断，tooltip 里给出完整标签。
-6. 文案提供中英文两套，标签和说明都不直接显示 namespace 或 Canonical Plugin ID。
+4. tooltip 只显示来源类型和一句说明，不附加市场标签、URL 或域名。带协议的完整 canonical URL 只在插件详情信息表
+   的“来源市场”一行显示，带复制按钮；`source_url` 为空时这一行不显示。官方插件的这一行显示“Ora 官方市场”。
+5. tooltip 限宽并允许换行。标签在窄空间里可以截断，但用户应能在 tooltip 之外查看完整标签（例如悬停标签本身或在
+   插件详情中）。
+6. 文案提供中英文两套，标签和说明都不直接显示 namespace 或 Canonical Plugin ID。标签里为消歧带出的 host 等段是
+   标签的一部分，不属于“在 tooltip 中放域名”。
 
 为什么 tooltip 不放 URL：tooltip 在 `/` 菜单这类高频、狭窄的位置出现，URL 长度不可控，放进去会把说明挤掉；而且
 标签已经由 URL 的段构成，域名在多数情况下（都在 github.com）并不提供更多区分信息。需要核对完整地址的用户，在插件
@@ -187,8 +196,10 @@ canonical URL 已经去掉 userinfo、默认端口、尾部 `/` 与 `.git` 并�
 2. **技能页**：每张 Skill 卡片显示来源标签，替换原来显示 plugin ID、会折叠成图标的按钮；插件 Skill 的标签仍可以
    点击跳转到所属插件。
 3. **插件市场卡片**：按 Namespace D6 显示来源标签，与前两处使用同一组件和文案。
-4. **查询失效**：添加、编辑或删除市场源成功后，前端让 Skill 列表、已安装插件列表和市场列表的查询失效。新增绑定
-   可能改变其他来源的标签，三处界面因此不需要重启就能看到消歧后的标签。插件安装和卸载沿用已有的失效规则。
+4. **查询失效**：添加、编辑或删除市场源的操作结束后，无论成功还是失败，前端都让 Skill 列表、已安装插件列表、市场
+   列表和市场源列表的查询失效。新增绑定可能改变其他来源的标签，而多步操作（如先添加、再写入获取配置）在后一步
+   失败并回滚配置时，前一步写入的绑定仍会保留。三处界面因此不需要重启就能看到消歧后的标签。插件安装和卸载沿用
+   已有的失效规则。
 
 ## 为什么不是这些替代方案
 
@@ -206,20 +217,21 @@ canonical URL 已经去掉 userinfo、默认端口、尾部 `/` 与 `.git` 并�
 
 1. 来源只由插件的 namespace 决定：`local` 是本地包，`official` 是官方，其余是第三方市场；本地 Skill 是用户来源。
 2. 插件提供的 Skill 与所属插件的来源相同。
-3. 第三方市场标签只在后端计算，比较集合是 `plugin_source_namespace` 的全部绑定；同一份绑定集合下，三个查询对同一
-   来源给出相同标签。
+3. 第三方市场标签只在后端计算，比较集合是 `plugin_source_namespace` 的全部绑定；同一份绑定集合下，所有带 `origin`
+   的响应对同一来源给出相同标签，同一组内的标签按显示文本互不相同。
 4. 标签不持久化、不参与任何身份匹配；身份仍是 namespace 与 Canonical Plugin ID。
 5. 标签计算不按平台解析 URL 结构，只比较 canonical URL 的段。
-6. 用户可见的标签和 tooltip 不显示 namespace、Canonical Plugin ID、完整 URL 或域名；完整 URL 只出现在插件详情。
+6. 用户可见的标签和 tooltip 不显示 namespace 或 Canonical Plugin ID；tooltip 不显示标签、URL 或域名。带协议的完整
+   canonical URL 只出现在插件详情；标签里为消歧带出的段（含 host）或回落时的完整地址属于标签本身。
 7. 第三方市场的 tooltip 体现“首次从该市场引入”。
-8. 绑定缺失时列表查询不失败，该条目降级显示，并记录告警。
+8. 绑定缺失或绑定表读取失败时响应不失败，受影响的条目降级显示，并记录告警。
 
 ## 风险
 
 - **标签会变**：用户新增一个同名市场后，已有来源的标签会变长。这是有意的：标签是展示，不是身份。用户可能一时认不出
   变化后的标签，tooltip 的类型说明和插件详情的完整 URL 用来兜底。
-- **回落为完整 URL 时标签很长**：只在比较集合里出现规则 4 的交叉差异时发生，实际很少见；标签组件需要支持截断，
-  tooltip 给出完整标签。
+- **回落为完整 URL 时标签很长**：只在比较集合里出现规则 4、5 的交叉差异时发生，实际很少见；标签组件需要支持截断，
+  并让用户在 tooltip 之外看到完整标签。
 
 ## 本决策未解决的问题
 
@@ -230,9 +242,9 @@ canonical URL 已经去掉 userinfo、默认端口、尾部 `/` 与 `.git` 并�
 ## 落地顺序
 
 1. **契约与后端**：增加 `PluginOrigin`，`SkillSource::Plugin`、`InstalledPlugin`、`AvailablePlugin` 带上 `origin`；
-   实现 namespace 反查与标签计算，三个查询装配 `origin`。完成条件：标签计算对 D3 表中的例子给出表中结果，三个查询对
-   同一来源返回相同标签，绑定缺失时降级而不失败。
-2. **前端**：共用来源标签组件接入 `/` 菜单、技能页和插件市场卡片，插件详情增加来源市场行，市场源变更后失效三个查询，
+   实现 namespace 反查与标签计算，所有返回这些类型的响应装配 `origin`。完成条件：标签计算对 D3 表中的例子给出表中
+   结果，各响应对同一来源返回相同标签，绑定缺失或读取失败时降级而不失败。
+2. **前端**：共用来源标签组件接入 `/` 菜单、技能页和插件市场卡片，插件详情增加来源市场行，市场源变更结束后（含失败）失效相关查询，
    补中英文文案。完成条件：四类来源在三处都显示正确标签和 tooltip；新增同名市场源后不重启即可看到消歧标签。
 
 两步在同一个 desktop 版本发布，前后端契约同时变化。从这个版本开始，三处界面显示来源标签，技能页不再显示 plugin ID；
