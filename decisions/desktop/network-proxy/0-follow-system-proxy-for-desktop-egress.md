@@ -14,10 +14,11 @@ Desktop 宿主为自更新和主动使用代理的市场源提供同一套出站
 | --- | --- |
 | 无模式，无旧手动配置 | 跟随系统（`System`） |
 | 无模式，有有效旧手动配置 | 手动（`Manual`），保留原地址、端口和凭据 |
+| 保存了 Manual，旧版清空了手动配置 | 跟随系统（`System`），可重新保存手动配置 |
 | 明确保存任一模式 | 以该模式为准，重启后继续生效 |
 | 配置读取失败，或模式、必需字段无法解析 | 明确报告错误，保留已有值 |
 
-模式与手动配置均由 Desktop 宿主拥有。现有手动配置保存在 SQLite `user_config`，模式使用同表的独立 typed key；保存手动模式时，两项在同一事务中提交。未保存的编辑不改变后台请求。默认值仅用于缺失，读取出错不会覆盖任何数据。
+模式与手动配置均由 Desktop 宿主拥有。现有手动配置保存在 SQLite `user_config`，模式使用同表的独立 typed key；保存手动模式时，两项在同一事务中提交。未保存的编辑不改变后台请求。默认值仅用于缺失，读取出错不会覆盖任何数据。设置页报告未知模式并提供重试，用户也可以主动选择并保存新模式，或清空配置恢复默认。
 
 切换到 System 或 Direct 时保留已保存的手动配置，切回 Manual 时可以复用。旧版只读取手动配置并忽略模式，所以降级后，仍保有手动配置的安装会使用该手动代理，即使新版最后选择的是 System 或 Direct。这是本决策接受的降级行为。
 
@@ -25,7 +26,7 @@ Desktop 宿主为自更新和主动使用代理的市场源提供同一套出站
 
 每次新操作读取已保存的模式，按实际 HTTP(S) 目标决定路由。回环地址始终直连。直连模式忽略环境和系统代理；手动模式使用 Ora 保存的代理。跟随系统时，系统明确要求绕过或没有配置时直连。已选用的代理连不上、解析失败或配置类型不受支持时报告原因，避免私自改走直连。
 
-- **Windows** 通过 [WinHTTP 当前用户配置](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/nf-winhttp-winhttpgetieproxyconfigforcurrentuser) 读取静态代理与绕过列表，按目的协议选用。System 只读 WinHTTP，不读取代理环境变量。仅有 PAC 或自动发现时提示首版不支持。存在静态配置时按静态配置解析。
+- **Windows** 通过 [WinHTTP 当前用户配置](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/nf-winhttp-winhttpgetieproxyconfigforcurrentuser) 读取静态代理与绕过列表，按目的协议选用。System 只读 WinHTTP，不读取代理环境变量。仅开启自动检测且没有 PAC 地址时视为系统未配置代理，使用直连，设置页说明 Ora 不运行 WPAD。只有显式 PAC 地址时报告不支持；存在静态配置时按静态配置解析。此规则使 Windows 默认自动检测设置下的更新请求仍可直连。D1 的降级与恢复规则和本条 Windows 行为依据 [owner 审查结论](https://github.com/ora-space/circus/issues/1556#issuecomment-7188276033)。
 - **Linux** 有可用的静态后端时，使用 [GIO 系统解析器](https://gnome.pages.gitlab.gnome.org/libsoup/gio/GProxyResolver.html) 读取静态设置及绕过规则。首版不得调用会求值 PAC/WPAD 的路径。没有可用的静态后端时（包括 GIO 返回占位解析器，即使它给出 `direct://`），读取 `HTTP_PROXY`、`HTTPS_PROXY`，再按目标协议回退到 `ALL_PROXY`，并尊重 `NO_PROXY` 与相应小写变量。系统明确返回直连、仅配置自动代理或解析失败时，各自应用前述结果，不能把这些结果混成解析器不可用。正式实现验收须实际运行 AppImage 和 deb，记录可用的桌面与运行时组合；若能取得同版本 rpm 测试包也核对其行为，rpm 不扩大当前发布范围。
 
 代理返回 HTTP 407 时按代理认证失败报告，连接测试也不得记为连通成功。首版支持现有手动凭据，不支持 Windows 集成代理认证。
