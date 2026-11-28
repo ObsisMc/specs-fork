@@ -1,9 +1,8 @@
 # 插件来源展示与市场标签
 
 依据[已批准的插件来源展示决策](../../../../decisions/desktop/plugin/registry/20261127-plugin-origin-presentation.md)。
-实现尚未合入 desktop 的 main，下表义务的证据状态一律如实标为 `Missing`；“所需直接证据”按 desktop
-未合入变更中的目标测试登记（路径相对 desktop 仓库根目录），ADR 转为 `implemented` 时按合入后的最终
-测试逐项核对并回填状态，不以目标变更存在测试替代合入后的核对。尚无目标测试的义务直接写明缺口。
+实现尚未合入 desktop 的 main，下表义务的证据状态一律如实标为 `Missing`，证据列一律为“尚无”；
+具体测试留到落地运行按合并后的提交填写，ADR 转为 `implemented` 时按合入后的最终测试逐项核对并回填状态。
 [身份与 namespace 用例](identity-and-namespace.md)的证据保持各自范围，不推导本文新义务。
 
 ## Plugin Origin Is a Plugin-Level Attribute Carried by Every Origin-Bearing Response
@@ -46,11 +45,11 @@
 
 | 义务 | 所需直接证据 | 状态 |
 |---|---|---|
-| 保留与绑定的 namespace 按四类判定，第三方带 URL 与标签 | `crates/domain/src/plugin_origin.rs` 的 `classifies_reserved_and_bound_namespaces`：`local`/`official` 无需绑定即判定，绑定 namespace 得到带 URL 与消歧标签的 Marketplace | Missing |
-| 插件 Skill 继承所属插件的来源 | `crates/application/src/skill/tests.rs` 的 `listed_plugin_skills_inherit_their_plugins_marketplace_origin`：列出的插件 Skill 携带其插件 namespace 解析出的 origin | Missing |
-| 市场条目装配 origin，顶层 `source_url` 保留 | `crates/backend/src/plugin/listing.rs` 的 `labels_a_third_party_listing_against_its_namesakes`：第三方条目同时带 `source_url` 与按全部绑定计算的标签 | Missing |
-| origin 的前后端序列化形状固定（kind 判别、camelCase 字段） | `crates/contracts/src/plugin/origin.rs` 的 `serializes_with_a_kind_tag_and_camel_case_fields` | Missing |
-| 扫描、激活/停止、索引同步等其余响应同样装配 origin | 目标变更尚无覆盖这些响应的直接测试；上述测试只覆盖 Skill 列表与市场列表 | Missing |
+| 保留与绑定的 namespace 按四类判定，第三方带 URL 与标签 | 尚无 | Missing |
+| 插件 Skill 继承所属插件的来源 | 尚无 | Missing |
+| 市场条目装配 origin，顶层 `source_url` 保留 | 尚无 | Missing |
+| origin 的前后端序列化形状固定（kind 判别、camelCase 字段） | 尚无 | Missing |
+| 扫描、激活/停止、索引同步等其余响应同样装配 origin | 尚无 | Missing |
 
 ### 决策依据
 
@@ -102,15 +101,15 @@ D1、D2 规则 1–3；不变量 1、2。来源语义继承来源派生 Namespac
 
 | 义务 | 所需直接证据 | 状态 |
 |---|---|---|
-| 唯一仓库名取最后一段 | `crates/utils/src/url/repository_label.rs` 的 `a_unique_name_is_the_whole_label` | Missing |
-| 同名 fork 按相邻段区分 | 同文件 `forks_are_told_apart_by_the_adjacent_segment` | Missing |
-| 默认源 fork 行：fork 显示 `obsismc/marketplace`，默认源自身“官方” | 目标变更尚无该测试：目标实现目前仍把默认源排除在比较集合外，需按本决策修正后补测试 | Missing |
-| 同路径不同 host 带出 host | 同文件 `the_same_path_on_two_hosts_shows_the_host` | Missing |
-| 非默认端口保留在标签中 | 同文件 `a_self_hosted_port_is_kept_in_the_label` | Missing |
-| 无单个区分段回落完整 URL（规则 4） | 同文件 `crossing_differences_fall_back_to_the_full_url` | Missing |
-| 显示文本撞名整组回落（规则 5） | 同文件 `colliding_labels_send_the_whole_group_to_full_urls` | Missing |
-| 平台字面量按普通段比较、照样显示 | 同文件 `azure_projects_are_told_apart_without_parsing_git_literals` | Missing |
-| 不同深度按末尾对齐，本来源缺段的位置跳过 | 同文件 `gitlab_subgroups_of_different_depths_are_aligned_from_the_end` | Missing |
+| 唯一仓库名取最后一段 | 尚无 | Missing |
+| 同名 fork 按相邻段区分 | 尚无 | Missing |
+| 默认源 fork 行：fork 显示 `obsismc/marketplace`，默认源自身“官方” | 尚无 | Missing |
+| 同路径不同 host 带出 host | 尚无 | Missing |
+| 非默认端口保留在标签中 | 尚无 | Missing |
+| 无单个区分段回落完整 URL（规则 4） | 尚无 | Missing |
+| 显示文本撞名整组回落（规则 5） | 尚无 | Missing |
+| 平台字面量按普通段比较、照样显示 | 尚无 | Missing |
+| 不同深度按末尾对齐，本来源缺段的位置跳过 | 尚无 | Missing |
 
 ### 决策依据
 
@@ -147,8 +146,8 @@ D3 分段、比较集合、计算规则 1–5 与例表；不变量 3、5。段�
 
 | 义务 | 所需直接证据 | 状态 |
 |---|---|---|
-| 各响应对同一来源装配相同标签 | 目标变更尚无跨响应的直接测试；`labels_a_third_party_listing_against_its_namesakes` 与 `listed_plugin_skills_inherit_their_plugins_marketplace_origin` 只各自证明单一响应的装配 | Missing |
-| 标签不持久化，新增绑定后下一次查询即生效 | 目标变更尚无该测试 | Missing |
+| 各响应对同一来源装配相同标签 | 尚无 | Missing |
+| 标签不持久化，新增绑定后下一次查询即生效 | 尚无 | Missing |
 
 ### 决策依据
 
@@ -187,8 +186,8 @@ D3 时机与身份边界；不变量 3。
 
 | 义务 | 所需直接证据 | 状态 |
 |---|---|---|
-| 绑定缺失降级为 slug 标签、`source_url` 为空 | `crates/domain/src/plugin_origin.rs` 的 `an_unbound_namespace_degrades_to_its_slug` | Missing |
-| 绑定表读取失败时全部派生 namespace 降级、记录告警、响应不失败 | 目标变更尚无该测试（backend `SourceNamespaceOrigins` 的读取失败分支） | Missing |
+| 绑定缺失降级为 slug 标签、`source_url` 为空 | 尚无 | Missing |
+| 绑定表读取失败时全部派生 namespace 降级、记录告警、响应不失败 | 尚无 | Missing |
 
 ### 决策依据
 
@@ -229,8 +228,8 @@ D2 规则 4；不变量 8。
 
 | 义务 | 所需直接证据 | 状态 |
 |---|---|---|
-| 新增同名来源后标签变化而 namespace 与 Canonical Plugin ID 不变 | 目标变更尚无该测试；身份不可变的既有证据在[身份与 namespace 用例](identity-and-namespace.md)，不含标签维度，不推导本义务 | Missing |
-| 市场源变更（含失败）后查询失效、不重启看到新标签 | 目标变更尚无该测试 | Missing |
+| 新增同名来源后标签变化而 namespace 与 Canonical Plugin ID 不变 | 尚无 | Missing |
+| 市场源变更（含失败）后查询失效、不重启看到新标签 | 尚无 | Missing |
 
 ### 决策依据
 
