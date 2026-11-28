@@ -60,6 +60,7 @@ desktop#837/#853/#857、Q2 desktop#839 与收尾小 PR desktop#860 合并后的 
 - 调用方带模型意图，Agent 提供该模型。
 - 分别由 `session/new` 建立会话、由 `session/load` 恢复会话、切换 Agent。
 - 旧推送 A 分别落在：短收集窗口内；收集窗口之后、意图答复之前；恢复答复之后、意图答复之前。
+- 另设没有模型意图、选项推送早于 `session/new` 答复的情形，答复分别带选项、带显式空列表、不带选项。
 
 ### 触发
 
@@ -69,6 +70,7 @@ Agent 推送 A，再答复意图为 B，随后发送第一条 prompt 并加载�
 
 - 当前选项是 B，之后的加载得到 B。
 - 旧推送不随第一条 prompt 送给视图。
+- 早于 `session/new` 答复的推送只在答复带选项时被替代，显式空列表也算带选项；不带选项的答复不替代推送。
 
 ### 禁止结果
 
@@ -78,14 +80,15 @@ Agent 推送 A，再答复意图为 B，随后发送第一条 prompt 并加载�
 
 | 验证义务 | 代表性证据测试 | 状态 |
 | --- | --- | --- |
-| 收集窗口之后的旧推送不被采用，之后的加载得到意图答复的值（复现） | [a_snapshot_older_than_the_applied_model_does_not_undo_it](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/setup_options_tests.rs#L240)、[a_snapshot_pushed_before_setup_was_answered_does_not_undo_the_answer](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/setup_options_tests.rs#L267) 读序边界丢弃早于带选项 `session/new` 答复的推送；[an_empty_answer_replaces_a_snapshot_pushed_before_it](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/setup_options_tests.rs#L283) 显式空列表也作边界 | `Covered` |
+| 收集窗口之后的旧推送不被采用，之后的加载得到意图答复的值（复现） | [a_snapshot_older_than_the_applied_model_does_not_undo_it](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/setup_options_tests.rs#L240) 的 `AppliedAfterPush` 分支 | `Covered` |
+| 早于 `session/new` 答复的选项推送只在答复带选项时被替代，显式空列表也算带选项（新增） | [a_snapshot_pushed_before_setup_was_answered_does_not_undo_the_answer](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/setup_options_tests.rs#L267)、[an_empty_answer_replaces_a_snapshot_pushed_before_it](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/setup_options_tests.rs#L283)、[a_snapshot_pushed_before_an_answer_without_options_is_kept](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/setup_options_tests.rs#L299) 答复省略选项时保留推送 | `Covered` |
 | 收集窗口之后的旧推送不随第一条 prompt 送给视图（回归保护） | [a_snapshot_older_than_the_applied_model_does_not_undo_it](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/setup_options_tests.rs#L240) 第一条 prompt 只带 mode，不带旧选项 | `Covered` |
 | 恢复答复之后、意图答复之前的旧推送不被采用（复现） | [a_restored_session_is_on_the_model_its_agent_accepted](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/setup_options_tests.rs#L319) 恢复分支按读帧先后，意图答复生效 | `Covered` |
 | 收集窗口内的旧推送不撤销意图答复，不随第一条 prompt 送出（回归保护） | [a_snapshot_older_than_the_applied_model_does_not_undo_it](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/setup_options_tests.rs#L240) | `Covered` |
 
 ### 决策依据
 
-- D2 第 2、3 点。
+- D1 第 2 点，D2 第 2、3 点。
 
 ## Frames From A Replaced Binding Must Not Describe Its Replacement
 
