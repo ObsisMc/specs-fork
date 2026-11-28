@@ -205,7 +205,7 @@ Agent 推送 A，再答复意图为 B，随后发送第一条 prompt 并加载�
 | 连接断开（包括 Agent 进程被替换）时返回失败（新增） | [a_change_in_flight_is_settled_when_its_session_goes](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/set_config_tests.rs#L835) 的 Disconnected/DisconnectedMidTurn 分支；进程被替换并入断连，无单独用例 | `Covered` |
 | 各读队列的循环识别设置答复（新增） | [a_change_answered_while_a_turn_is_cancelled_is_kept](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/set_config_tests.rs#L697)、[a_change_answered_just_before_a_cancelled_turn_is_kept](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/set_config_tests.rs#L725)、[a_change_answered_before_the_cancel_is_written_is_taken](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/turn_cancel_tests.rs#L464)、[a_change_answered_before_the_queue_is_drained_is_taken](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/turn_cancel_tests.rs#L486)、[a_change_written_late_is_answered](https://github.com/ora-space/desktop/blob/d35f4d1a636d1f64cdfaeaae2064d2b7c79f557f/crates/agent-runtime/src/restored_sessions/set_config_tests.rs#L785)；标题轮询、MCP 刷新见「来源与顺序」首条用例 | `Covered` |
 
-setup 重放、看门狗合并取消两个收尾点的确定性用例，待 `end_on_channel` 改为带原因的枚举时一起补（owner 结论，circus#1565）；共用收尾函数的变异已有用例抓到。
+setup 重放、看门狗合并取消两个收尾点的确定性用例，待 `end_on_channel` 改为带原因的枚举时一起补（owner 结论，circus#1565），由 [circus#1647](https://github.com/ora-space/circus/issues/1647) 承接；共用收尾函数的变异已有用例抓到。
 
 ### 决策依据
 
